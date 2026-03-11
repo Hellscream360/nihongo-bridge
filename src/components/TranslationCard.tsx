@@ -1,8 +1,8 @@
-import type { TranslationFrJp, TranslationJpFr } from '../lib/openai';
+import type { TranslationFrJp, TranslationJpFr, TranslationPhoto } from '../lib/openai';
 
 interface Props {
-  translation: TranslationFrJp | TranslationJpFr;
-  direction: 'fr-jp' | 'jp-fr';
+  translation: TranslationFrJp | TranslationJpFr | TranslationPhoto;
+  direction: 'fr-jp' | 'jp-fr' | 'photo';
 }
 
 function speakJapanese(text: string) {
@@ -29,12 +29,14 @@ export default function TranslationCard({ translation, direction }: Props) {
       {/* Source */}
       <div className="px-4 py-3 rounded-2xl bg-nihon-surface border border-nihon-border">
         <span className="text-[11px] font-mono uppercase tracking-widest text-nihon-text-muted block mb-1">
-          {direction === 'fr-jp' ? '🇫🇷 Français' : '🇯🇵 Japonais (input)'}
+          {direction === 'fr-jp' ? '🇫🇷 Français' : direction === 'photo' ? '📷 Texte détecté' : '🇯🇵 Japonais (input)'}
         </span>
         <p className="text-nihon-text text-base font-body">
           {direction === 'fr-jp'
             ? (t as TranslationFrJp).french
-            : (t as TranslationJpFr).japanese_input}
+            : direction === 'photo'
+              ? (t as TranslationPhoto).detected_text
+              : (t as TranslationJpFr).japanese_input}
         </p>
       </div>
 
@@ -81,15 +83,15 @@ export default function TranslationCard({ translation, direction }: Props) {
         </p>
       </div>
 
-      {/* French translation (for JP→FR) */}
-      {direction === 'jp-fr' && (
+      {/* French translation (for JP→FR and photo) */}
+      {(direction === 'jp-fr' || direction === 'photo') && (
         <div className="px-4 py-3 rounded-2xl bg-nihon-accent-soft border border-nihon-accent/20">
           <div className="flex items-center justify-between mb-1">
             <span className="text-[11px] font-mono uppercase tracking-widest text-nihon-french">
               🇫🇷 Traduction
             </span>
             <button
-              onClick={() => speakFrench((t as TranslationJpFr).french)}
+              onClick={() => speakFrench(direction === 'photo' ? (t as TranslationPhoto).french : (t as TranslationJpFr).french)}
               className="text-nihon-text-muted hover:text-nihon-french transition-colors p-1"
               title="Écouter en français"
             >
@@ -101,7 +103,7 @@ export default function TranslationCard({ translation, direction }: Props) {
             </button>
           </div>
           <p className="text-nihon-french text-lg font-body font-medium">
-            {(t as TranslationJpFr).french}
+            {direction === 'photo' ? (t as TranslationPhoto).french : (t as TranslationJpFr).french}
           </p>
         </div>
       )}

@@ -4,19 +4,22 @@ import VoiceRecorder from './VoiceRecorder';
 import {
   translateFrToJp,
   translateJpToFr,
+  translatePhoto,
   isApiKeyConfigured,
   type TranslationFrJp,
   type TranslationJpFr,
+  type TranslationPhoto,
 } from '../lib/openai';
 import { addToHistory } from '../lib/storage';
 
-type Mode = 'fr-jp' | 'jp-fr';
-type Translation = TranslationFrJp | TranslationJpFr;
+type Mode = 'fr-jp' | 'jp-fr' | 'photo';
+type Translation = TranslationFrJp | TranslationJpFr | TranslationPhoto;
 
 interface ConversationEntry {
   id: string;
   direction: Mode;
   translation: Translation;
+  photoPreview?: string;
 }
 
 export default function TranslatorApp() {
@@ -43,6 +46,7 @@ export default function TranslatorApp() {
   });
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
 
   const scrollToBottom = useCallback(() => {
@@ -74,6 +78,34 @@ export default function TranslatorApp() {
       scrollToBottom();
     } catch (err: any) {
       setError(err.message || 'Erreur de traduction');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isLoading, scrollToBottom]);
+
+  // ─── Photo handler ───
+  const handlePhoto = useCallback(async (file: File) => {
+    if (isLoading) return;
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const base64 = await fileToBase64(file);
+
+      const translation = await translatePhoto(base64);
+
+      const entry: ConversationEntry = {
+        id: crypto.randomUUID(),
+        direction: 'photo',
+        translation,
+        photoPreview: base64,
+      };
+
+      setConversation((prev) => [...prev, entry]);
+      addToHistory('photo', translation);
+      scrollToBottom();
+    } catch (err: any) {
+      setError(err.message || 'Erreur de traduction photo');
     } finally {
       setIsLoading(false);
     }
@@ -180,23 +212,33 @@ export default function TranslatorApp() {
           <div className="flex items-center bg-nihon-surface rounded-full p-0.5 border border-nihon-border">
             <button
               onClick={() => setMode('fr-jp')}
-              className={`px-3 py-1.5 rounded-full text-xs font-mono font-medium transition-all ${
+              className={`px-2.5 py-1.5 rounded-full text-[11px] font-mono font-medium transition-all ${
                 mode === 'fr-jp'
                   ? 'bg-nihon-accent text-white'
                   : 'text-nihon-text-soft hover:text-nihon-text'
               }`}
             >
-              FR → JP
+              FR→JP
             </button>
             <button
               onClick={() => setMode('jp-fr')}
-              className={`px-3 py-1.5 rounded-full text-xs font-mono font-medium transition-all ${
+              className={`px-2.5 py-1.5 rounded-full text-[11px] font-mono font-medium transition-all ${
                 mode === 'jp-fr'
                   ? 'bg-nihon-accent text-white'
                   : 'text-nihon-text-soft hover:text-nihon-text'
               }`}
             >
-              JP → FR
+              JP→FR
+            </button>
+            <button
+              onClick={() => setMode('photo')}
+              className={`px-2.5 py-1.5 rounded-full text-[11px] font-mono font-medium transition-all ${
+                mode === 'photo'
+                  ? 'bg-nihon-accent text-white'
+                  : 'text-nihon-text-soft hover:text-nihon-text'
+              }`}
+            >
+              📷
             </button>
           </div>
         </div>
@@ -209,23 +251,39 @@ export default function TranslatorApp() {
             <span className="text-5xl">⛩️</span>
             <div className="space-y-1">
               <p className="text-nihon-text font-display text-base">
-                {mode === 'fr-jp' ? 'Écris ou dicte en français' : 'Enregistre du japonais'}
+                {mode === 'fr-jp'
+                  ? 'Écris ou dicte en français'
+                  : mode === 'jp-fr'
+                    ? 'Enregistre du japonais'
+                    : 'Prends une photo de texte japonais'}
               </p>
               <p className="text-nihon-text-muted text-xs font-mono">
                 {mode === 'fr-jp'
                   ? 'La traduction apparaîtra en romaji, kana et kanji'
-                  : 'Maintiens le micro pour enregistrer'}
+                  : mode === 'jp-fr'
+                    ? 'Maintiens le micro pour enregistrer'
+                    : 'Panneau, menu, affiche...'}
               </p>
             </div>
           </div>
         )}
 
         {conversation.map((entry) => (
-          <TranslationCard
-            key={entry.id}
-            translation={entry.translation}
-            direction={entry.direction}
-          />
+          <div key={entry.id}>
+            {entry.photoPreview && (
+              <div className="mb-3 rounded-2xl overflow-hidden border border-nihon-border">
+                <img
+                  src={entry.photoPreview}
+                  alt="Photo capturée"
+                  className="w-full max-h-48 object-cover"
+                />
+              </div>
+            )}
+            <TranslationCard
+              translation={entry.translation}
+              direction={entry.direction}
+            />
+          </div>
         ))}
 
         {/* Loading state */}
@@ -236,7 +294,9 @@ export default function TranslatorApp() {
               <span className="w-2 h-2 bg-nihon-accent rounded-full animate-bounce [animation-delay:150ms]" />
               <span className="w-2 h-2 bg-nihon-accent rounded-full animate-bounce [animation-delay:300ms]" />
             </div>
-            <span className="text-nihon-text-soft text-sm font-body">Traduction en cours...</span>
+            <span className="text-nihon-text-soft text-sm font-body">
+              {mode === 'photo' ? 'Analyse de l\'image...' : 'Traduction en cours...'}
+            </span>
           </div>
         )}
 
@@ -289,7 +349,7 @@ export default function TranslatorApp() {
               </svg>
             </button>
           </div>
-        ) : (
+        ) : mode === 'jp-fr' ? (
           /* JP → FR : push-to-talk */
           <div className="flex flex-col items-center gap-2 py-2">
             <VoiceRecorder
@@ -324,8 +384,58 @@ export default function TranslatorApp() {
               </button>
             </div>
           </div>
+        ) : (
+          /* Photo mode */
+          <div className="flex flex-col items-center gap-3 py-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handlePhoto(file);
+                e.target.value = '';
+              }}
+            />
+            <div className="flex items-center gap-3">
+              {/* Camera button */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading}
+                className={`
+                  relative w-20 h-20 rounded-full flex items-center justify-center
+                  transition-all duration-300 select-none
+                  bg-nihon-surface border-2 border-nihon-border hover:border-nihon-accent/50 active:scale-95
+                  ${isLoading ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
+                `}
+              >
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#F0EDE6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+              </button>
+            </div>
+            <span className="text-xs font-mono text-nihon-text-muted text-center">
+              {isLoading ? 'Analyse en cours...' : 'Prendre une photo ou choisir une image'}
+            </span>
+          </div>
         )}
       </div>
+
+      {/* Hidden file input for photo from gallery */}
     </div>
   );
+}
+
+// ─── Utils ───
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }

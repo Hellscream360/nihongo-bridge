@@ -4,7 +4,10 @@ const API_BASE = 'https://api.openai.com/v1';
 function getApiKey(): string {
   return (typeof window !== 'undefined' && (window as any).__OPENAI_KEY) || '';
 }
-const MODEL = 'gpt-4o-mini';
+
+const MODEL_TEXT = 'gpt-4.1-nano';
+const MODEL_VISION = 'gpt-4.1-nano';
+const MODEL_TRANSCRIBE = 'gpt-4o-mini-transcribe';
 
 // ─── Types ───
 export interface TranslationFrJp {
@@ -18,6 +21,16 @@ export interface TranslationFrJp {
 
 export interface TranslationJpFr {
   japanese_input: string;
+  french: string;
+  romaji: string;
+  hiragana: string;
+  kanji: string;
+  literal: string;
+  notes?: string;
+}
+
+export interface TranslationPhoto {
+  detected_text: string;
   french: string;
   romaji: string;
   hiragana: string;
@@ -53,6 +66,21 @@ Réponds UNIQUEMENT en JSON valide, sans markdown, sans backticks, avec cette st
   "notes": "note culturelle ou grammaticale si pertinent (1 phrase max, sinon chaîne vide)"
 }`;
 
+const SYSTEM_PHOTO = `Tu es un expert en lecture et traduction de texte japonais sur des photos.
+L'utilisateur t'envoie une photo d'un panneau, menu, affiche ou tout support contenant du texte japonais.
+Détecte TOUT le texte japonais visible sur l'image et traduis-le en français.
+Si plusieurs éléments de texte sont présents, regroupe-les de manière logique.
+Réponds UNIQUEMENT en JSON valide, sans markdown, sans backticks, avec cette structure exacte :
+{
+  "detected_text": "tout le texte japonais détecté sur l'image, tel quel",
+  "french": "la traduction complète en français",
+  "romaji": "le texte en romaji UNIQUEMENT en lettres latines (a-z), AUCUN caractère japonais autorisé",
+  "hiragana": "le texte en hiragana/katakana uniquement, aucune lettre latine",
+  "kanji": "le texte avec kanji tels que détectés sur l'image",
+  "literal": "traduction mot à mot pour comprendre la structure",
+  "notes": "contexte utile : type de panneau, niveau de politesse, info culturelle (1-2 phrases max, sinon chaîne vide)"
+}`;
+
 // ─── API Calls ───
 
 async function callGPT(systemPrompt: string, userMessage: string): Promise<string> {
@@ -63,7 +91,7 @@ async function callGPT(systemPrompt: string, userMessage: string): Promise<strin
       'Authorization': `Bearer ${getApiKey()}`,
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: MODEL_TEXT,
       temperature: 0.3,
       messages: [
         { role: 'system', content: systemPrompt },
@@ -75,6 +103,44 @@ async function callGPT(systemPrompt: string, userMessage: string): Promise<strin
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(`OpenAI API error: ${res.status} — ${err?.error?.message || 'Unknown'}`);
+  }
+
+  const data = await res.json();
+  return data.choices[0].message.content.trim();
+}
+
+async function callGPTVision(systemPrompt: string, imageBase64: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${getApiKey()}`,
+    },
+    body: JSON.stringify({
+      model: MODEL_VISION,
+      temperature: 0.3,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image_url',
+              image_url: { url: imageBase64 },
+            },
+            {
+              type: 'text',
+              text: 'Traduis tout le texte japonais visible sur cette image.',
+            },
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`OpenAI Vision API error: ${res.status} — ${err?.error?.message || 'Unknown'}`);
   }
 
   const data = await res.json();
@@ -97,12 +163,17 @@ export async function translateJpToFr(japaneseText: string): Promise<Translation
   return parseJSON<TranslationJpFr>(raw);
 }
 
-// ─── Whisper (Speech-to-Text) ───
+export async function translatePhoto(imageBase64: string): Promise<TranslationPhoto> {
+  const raw = await callGPTVision(SYSTEM_PHOTO, imageBase64);
+  return parseJSON<TranslationPhoto>(raw);
+}
+
+// ─── Speech-to-Text ───
 
 export async function transcribeAudio(audioBlob: Blob, language: string = 'ja'): Promise<string> {
   const formData = new FormData();
   formData.append('file', audioBlob, 'audio.webm');
-  formData.append('model', 'whisper-1');
+  formData.append('model', MODEL_TRANSCRIBE);
   formData.append('language', language);
 
   const res = await fetch(`${API_BASE}/audio/transcriptions`, {
@@ -115,7 +186,7 @@ export async function transcribeAudio(audioBlob: Blob, language: string = 'ja'):
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(`Whisper API error: ${res.status} — ${err?.error?.message || 'Unknown'}`);
+    throw new Error(`Transcription API error: ${res.status} — ${err?.error?.message || 'Unknown'}`);
   }
 
   const data = await res.json();
