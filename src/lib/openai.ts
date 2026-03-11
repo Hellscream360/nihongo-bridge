@@ -1,10 +1,8 @@
 // ─── Configuration ───
-// Pour un usage perso : mettre la clé dans .env (PUBLIC_OPENAI_KEY) ou la saisir dans l'UI
-const ENV_KEY = import.meta.env.PUBLIC_OPENAI_KEY || '';
 const API_BASE = 'https://api.openai.com/v1';
 
 function getApiKey(): string {
-  return (typeof window !== 'undefined' && (window as any).__OPENAI_KEY) || ENV_KEY;
+  return (typeof window !== 'undefined' && (window as any).__OPENAI_KEY) || '';
 }
 const MODEL = 'gpt-4o-mini';
 

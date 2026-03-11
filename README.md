@@ -8,12 +8,7 @@ PWA mobile-first pour communiquer au Japon. Tape ou dicte en français, obtiens 
 # Installer les dépendances
 npm install
 
-# Configurer la clé API OpenAI (2 options)
-
-# Option 1 : fichier .env
-echo "PUBLIC_OPENAI_KEY=sk-votre-cle" > .env
-
-# Option 2 : la saisir directement dans l'app au lancement
+# La clé API OpenAI se saisit directement dans l'app au lancement
 
 # Lancer en dev
 npm run dev
@@ -40,10 +35,10 @@ npm run build
 - Transcription via Whisper API
 - Traduction JP → FR avec affichage structuré
 
-### Sprint 4 — À faire
+### Sprint 4 — ✅ PWA + Déploiement
 - Service Worker pour cache offline
-- Install prompt PWA
-- Icônes 192x512
+- Manifest + icônes 192/512
+- Déploiement Netlify
 
 ## Stack
 
@@ -61,7 +56,4 @@ Whisper : ~0.006$/minute d'audio.
 
 ## Déploiement
 
-```bash
-npm run build
-# Déployer le dossier dist/ sur Cloudflare Pages, Vercel, ou GitHub Pages
-```
+Déployé sur Netlify. Push sur `main` déclenche un déploiement automatique.

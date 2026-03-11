@@ -145,7 +145,6 @@ export default function TranslatorApp() {
 
           <p className="text-nihon-text-muted text-[11px] font-mono text-center leading-relaxed">
             La clé reste sur ton téléphone, rien n'est envoyé à un serveur tiers.
-            <br />Tu peux aussi la mettre dans le fichier .env
           </p>
         </div>
       </div>
@@ -158,9 +157,24 @@ export default function TranslatorApp() {
       {/* Header */}
       <header className="flex-none px-4 pt-3 pb-2 border-b border-nihon-border/50">
         <div className="flex items-center justify-between">
-          <h1 className="text-lg font-display font-bold text-nihon-text">
-            日本語<span className="text-nihon-accent">Bridge</span>
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-display font-bold text-nihon-text">
+              日本語<span className="text-nihon-accent">Bridge</span>
+            </h1>
+            <button
+              onClick={() => {
+                setApiKey('');
+                setShowKeyInput(true);
+              }}
+              className="p-1.5 rounded-lg text-nihon-text-muted hover:text-nihon-text hover:bg-nihon-surface transition-all"
+              title="Modifier la clé API"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+              </svg>
+            </button>
+          </div>
 
           {/* Mode toggle */}
           <div className="flex items-center bg-nihon-surface rounded-full p-0.5 border border-nihon-border">
